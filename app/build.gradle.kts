@@ -25,8 +25,31 @@ android {
         }
     }
 
+    // 本地 / CI 通过环境变量注入签名信息；没有 keystore 时打不签名的包
+    val keystoreFile = providers.environmentVariable("TOOLIB_KEYSTORE_PATH").orNull
+        ?.takeIf { it.isNotBlank() }
+        ?.let { file(it) }
+    val hasKeystore = keystoreFile != null && keystoreFile.exists()
+
+    signingConfigs {
+        if (hasKeystore) {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = providers.environmentVariable("TOOLIB_KEYSTORE_PASSWORD").orNull
+                keyAlias = providers.environmentVariable("TOOLIB_KEY_ALIAS").orNull
+                keyPassword = providers.environmentVariable("TOOLIB_KEY_PASSWORD").orNull
+                // minSdk 29：v1 用不上，v2 + v3 都要（v3 支持密钥轮换，Android 9+ 优先用它校验）
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = if (hasKeystore) signingConfigs.getByName("release") else null
+            // R8：压缩 + 混淆 + 资源裁剪
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
@@ -45,9 +68,20 @@ android {
 chaquopy {
     defaultConfig {
         version = "3.13"
-        buildPython("/opt/homebrew/bin/python3.13")
+        // 不写死路径：本机 / CI 上把 python3.13 放进 PATH 即可，需要时用环境变量覆盖
+        providers.environmentVariable("TOOLIB_BUILD_PYTHON").orNull?.let { buildPython(it) }
         pip {
             install("yt-dlp")
+        }
+    }
+}
+
+// AGP 9.5 的 Compose group mapping 任务默认拉 2.2.10，这个版本没有发布到 Maven Central；
+// 统一改成和 Kotlin 插件相同的版本。
+configurations.matching { it.name == "composeMappingProducerClasspath" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin" && requested.name == "compose-group-mapping") {
+            useVersion(libs.versions.kotlin.get())
         }
     }
 }

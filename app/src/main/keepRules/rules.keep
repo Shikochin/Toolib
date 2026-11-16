@@ -15,3 +15,6 @@
 -keepclassmembers class rikka.shizuku.Shizuku {
     private static rikka.shizuku.ShizukuRemoteProcess newProcess(java.lang.String[], java.lang.String[], java.lang.String);
 }
+
+# Chaquopy 从 Python 侧按名字调用 Java 回调，R8 不能改名/删掉这些成员。
+-keep interface dev.shiko.toolib.logic.YtDlpEngine$ProgressCallback { *; }
