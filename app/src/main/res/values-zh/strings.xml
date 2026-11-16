@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Toolib</string>
+
+    <!-- Home -->
+    <string name="tab_tools">工具</string>
+    <string name="tab_settings">设置</string>
+
+    <!-- Tool catalog -->
+    <string name="tool_media_download_title">媒体下载</string>
+    <string name="tool_media_download_description">从多个平台下载视频和音频</string>
+
+    <!-- Settings -->
+    <string name="settings_title">设置</string>
+    <string name="settings_section_appearance">外观</string>
+    <string name="settings_appearance_subtitle">主题、颜色、手势、缩放与 HDR</string>
+    <string name="settings_section_permissions">权限</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_github_title">GitHub 仓库</string>
+    <string name="settings_github_subtitle">源代码、问题反馈与最新版本</string>
+    <string name="settings_license_title">开源许可证</string>
+    <string name="settings_license_subtitle">Toolib 及其依赖项的许可信息</string>
+
+    <!-- Permission levels -->
+    <string name="permission_none_title">无需权限</string>
+    <string name="permission_none_explanation">无需任何额外权限即可使用</string>
+    <string name="permission_shell_title">Shell 权限</string>
+    <string name="permission_shell_explanation">通过 Shizuku 或 Sui 授予</string>
+    <string name="permission_root_title">Root 权限</string>
+    <string name="permission_root_explanation">通过 Magisk、KernelSU、APatch 或 Sui 授予</string>
+
+    <!-- Appearance -->
+    <string name="appearance_title">外观</string>
+    <string name="appearance_section_theme">主题</string>
+    <string name="appearance_mode_system">跟随系统</string>
+    <string name="appearance_mode_light">浅色</string>
+    <string name="appearance_mode_dark">深色</string>
+    <string name="appearance_accent_title">强调色</string>
+    <string name="appearance_accent_subtitle">生成应用的整体配色方案</string>
+    <string name="appearance_palette_title">色彩风格</string>
+    <string name="appearance_section_interaction">交互与显示</string>
+    <string name="appearance_predictive_back_title">预测性返回手势</string>
+    <string name="appearance_predictive_back_subtitle">返回时预览上一个页面</string>
+    <string name="appearance_predictive_back_unavailable">需要 Android 14 或更高版本</string>
+    <string name="appearance_page_scale_title">界面缩放</string>
+    <string name="appearance_page_scale_subtitle">调整界面元素的大小</string>
+    <string name="appearance_hdr_title">HDR</string>
+    <string name="appearance_hdr_subtitle">使用显示屏的高动态范围</string>
+    <string name="appearance_hdr_unavailable">此设备或系统不支持 HDR</string>
+    <string name="appearance_section_theme_colors">主题色</string>
+    <string name="appearance_swatch_primary">主色</string>
+    <string name="appearance_swatch_primary_container">主色容器</string>
+    <string name="appearance_swatch_secondary">次要色</string>
+    <string name="appearance_swatch_secondary_container">次要色容器</string>
+    <string name="appearance_swatch_tertiary">第三色</string>
+    <string name="appearance_swatch_tertiary_container">第三色容器</string>
+
+    <!-- Licenses -->
+    <string name="license_title">开源许可证</string>
+    <string name="license_section_project">项目许可证</string>
+    <string name="license_mit">MIT</string>
+    <string name="license_mit_subtitle">Toolib 项目的许可证</string>
+    <string name="license_section_dependencies">依赖项许可证</string>
+    <string name="license_dependencies_footer">此列表根据应用的依赖配置生成。</string>
+
+    <!-- Media download -->
+    <string name="media_title">媒体下载</string>
+    <string name="media_description">从多个平台下载视频和音频</string>
+    <string name="media_section_link">链接</string>
+    <string name="media_url_placeholder">粘贴视频、音频或播放列表链接</string>
+    <string name="media_action_inspect">解析媒体</string>
+    <string name="media_action_inspecting">正在解析…</string>
+    <string name="media_section_status">状态</string>
+    <string name="media_status_inspect_failed">无法解析该媒体</string>
+    <string name="media_playlist_title">选择播放列表项</string>
+    <plurals name="media_action_select_all">
+        <item quantity="other">全选 %1$d 项</item>
+    </plurals>
+    <string name="media_action_deselect_all">取消全选</string>
+    <string name="media_playlist_item_fallback">第 %1$d 项</string>
+    <string name="media_action_continue">继续（%1$d）</string>
+    <string name="media_config_title">下载设置</string>
+    <string name="media_section_download_type">下载类型</string>
+    <string name="media_kind_video">视频</string>
+    <string name="media_kind_audio">音频</string>
+    <string name="media_format_row">格式</string>
+    <string name="media_best_quality">最佳品质</string>
+    <string name="media_playlist_entries">播放列表项</string>
+    <string name="media_playlist_all_entries">全部项</string>
+    <plurals name="media_playlist_selected_count">
+        <item quantity="other">已选择 %1$d 项</item>
+    </plurals>
+    <string name="media_section_download_options">下载选项</string>
+    <string name="media_embed_metadata">嵌入元数据</string>
+    <string name="media_embed_thumbnail">嵌入缩略图</string>
+    <string name="media_write_subtitles">下载字幕</string>
+    <string name="media_embed_subtitles">嵌入字幕</string>
+    <string name="media_subtitle_languages">字幕语言</string>
+    <string name="media_download_playlist">下载播放列表</string>
+    <plurals name="media_playlist_on_subtitle">
+        <item quantity="other">下载已选择的 %1$d 项</item>
+    </plurals>
+    <string name="media_playlist_off_subtitle">关闭后仅下载当前视频</string>
+    <string name="media_section_video_processing">视频处理</string>
+    <string name="media_clip_range">片段范围</string>
+    <string name="media_duration_unavailable">无法获取时长</string>
+    <string name="media_action_start_download">开始下载</string>
+    <string name="media_action_downloading">正在下载…</string>
+    <string name="media_download_progress">正在下载 %1$d%%</string>
+    <string name="media_download_complete">下载完成</string>
+    <string name="media_action_retry_download">重试下载</string>
+    <string name="media_download_failed">下载失败</string>
+    <plurals name="media_download_saved">
+        <item quantity="other">下载完成，已保存 %1$d 个文件</item>
+    </plurals>
+    <string name="media_format_title">选择格式</string>
+    <string name="media_section_format">格式</string>
+    <string name="media_best_quality_subtitle">自动选择可用的最佳品质</string>
+    <string name="media_no_formats">没有可用的格式</string>
+    <string name="media_section_preview">媒体预览</string>
+    <string name="media_thumbnail_description">媒体缩略图</string>
+    <string name="media_format_video_label">视频</string>
+    <string name="media_format_audio_label">音频</string>
+
+    <!-- Media download errors -->
+    <string name="media_error_url_required">请输入媒体链接</string>
+    <string name="media_error_staging_directory">无法创建临时下载文件夹</string>
+    <string name="media_error_no_output">yt-dlp 未生成任何媒体文件</string>
+    <string name="media_error_invalid_info">yt-dlp 未返回有效的媒体信息</string>
+    <string name="media_error_create_file">无法创建媒体文件</string>
+    <string name="media_error_open_file">无法打开媒体文件</string>
+</resources>
