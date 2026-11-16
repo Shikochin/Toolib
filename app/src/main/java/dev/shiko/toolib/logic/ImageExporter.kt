@@ -50,6 +50,21 @@ object ImageExporter {
         return output.toByteArray()
     }
 
+    /** 单帧 WebP（API 30+ 无损）：动图 WebP 封装时逐帧用它。 */
+    fun encodeLosslessWebp(bitmap: Bitmap): ByteArray {
+        val output = ByteArrayOutputStream()
+        val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Bitmap.CompressFormat.WEBP_LOSSLESS
+        } else {
+            @Suppress("DEPRECATION")
+            Bitmap.CompressFormat.WEBP
+        }
+        if (!bitmap.compress(format, 100, output)) {
+            throw IOException("failed to encode webp frame")
+        }
+        return output.toByteArray()
+    }
+
     /** JPEG 没有透明通道，先把透明像素压到白底上。 */
     private fun flattenOnWhite(bitmap: Bitmap): Bitmap {
         val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)

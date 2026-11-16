@@ -30,4 +30,26 @@ class GifWriterTest {
         // 顺手落一份文件，方便用别的工具再校验
         File("/tmp/toolib-gifwriter-test.gif").writeBytes(bytes)
     }
+
+    @Test
+    fun writesAnimatedGif() {
+        val width = 32
+        val height = 24
+        val frames = (0 until 6).map { frame ->
+            IntArray(width * height) { index ->
+                val x = index % width
+                val y = index / width
+                (0xFF shl 24) or (((x * 8 + frame * 40) and 0xFF) shl 16) or
+                    (((y * 10) and 0xFF) shl 8) or ((frame * 45) and 0xFF)
+            }
+        }
+
+        val bytes = GifWriter.encodeAnimation(frames, width, height, delayCentiseconds = 7)
+
+        assertTrue("GIF89a header", String(bytes, 0, 6, Charsets.US_ASCII) == "GIF89a")
+        assertTrue("trailer", bytes.last().toInt() == 0x3B)
+        // 6 帧 × 至少 1 个 LZW 块
+        assertTrue("has frames", bytes.size > 300)
+        File("/tmp/toolib-gifwriter-anim.gif").writeBytes(bytes)
+    }
 }

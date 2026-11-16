@@ -1,27 +1,34 @@
 package dev.shiko.toolib.logic
 
 /**
- * 单帧 GIF 编码器（纯 Kotlin，不依赖 Android）。
+ * GIF 编码器（纯 Kotlin，不依赖 Android）：支持单帧和多帧动图。
  *
- * GIF 只有 256 色调色板，所以先把图片用中位切分量化到 256 色，再走标准 LZW 压缩。
- * 只输出静态图：Android 平台没有公开的动图编码 API，动图输入取第一帧。
+ * GIF 只有 256 色调色板，所以先用中位切分把所有帧量化到同一套 256 色，再逐帧走标准 LZW 压缩。
  */
 object GifWriter {
 
-    /** @param pixels 行优先的 ARGB 像素 */
-    fun encode(pixels: IntArray, width: Int, height: Int): ByteArray {
-        require(width > 0 && height > 0) { "empty image" }
-        require(pixels.size >= width * height) { "pixel buffer too small" }
+    /** 单帧 GIF。 */
+    fun encode(pixels: IntArray, width: Int, height: Int): ByteArray =
+        encodeAnimation(listOf(pixels), width, height, delayCentiseconds = 0)
 
-        val palette = quantize(pixels, width * height, MaxColors)
-        val indices = ByteArray(width * height)
-        val lookup = HashMap<Int, Int>()
-        for (i in 0 until width * height) {
-            val argb = pixels[i]
-            val key = ((argb shr 19) and 0x1F shl 10) or ((argb shr 11) and 0x1F shl 5) or ((argb shr 3) and 0x1F)
-            val index = lookup.getOrPut(key) { nearestColor(palette, argb) }
-            indices[i] = index.toByte()
-        }
+    /**
+     * 多帧 GIF。
+     *
+     * @param frames 每一帧的行优先 ARGB 像素
+     * @param delayCentiseconds 每帧停留时间（1/100 秒）
+     */
+    fun encodeAnimation(
+        frames: List<IntArray>,
+        width: Int,
+        height: Int,
+        delayCentiseconds: Int,
+    ): ByteArray {
+        require(frames.isNotEmpty()) { "no frames" }
+        require(width > 0 && height > 0) { "empty image" }
+        frames.forEach { require(it.size >= width * height) { "pixel buffer too small" } }
+
+        val palette = quantize(sampleFrames(frames, width * height), MaxColors)
+        val animated = frames.size > 1
 
         val out = ByteSink()
         out.ascii("GIF89a")
@@ -36,14 +43,73 @@ object GifWriter {
             out.byte((color shr 8) and 0xFF)
             out.byte(color and 0xFF)
         }
-        // 图像描述符
+        if (animated) writeLoopExtension(out)
+
+        val lookup = HashMap<Int, Int>()
+        for (pixels in frames) {
+            if (animated) writeGraphicControl(out, delayCentiseconds)
+            writeImageDescriptor(out, width, height)
+            val indices = ByteArray(width * height)
+            for (i in 0 until width * height) {
+                val argb = pixels[i]
+                val key = ((argb shr 19) and 0x1F shl 10) or
+                    ((argb shr 11) and 0x1F shl 5) or
+                    ((argb shr 3) and 0x1F)
+                indices[i] = lookup.getOrPut(key) { nearestColor(palette, argb) }.toByte()
+            }
+            writeImageData(out, indices)
+        }
+        out.byte(0x3B)
+        return out.toByteArray()
+    }
+
+    private const val MaxColors = 256
+
+    private fun sampleFrames(frames: List<IntArray>, pixelCount: Int): IntArray {
+        val step = maxOf(1, pixelCount / 20000)
+        val samples = ArrayList<Int>(frames.size * (pixelCount / step + 1))
+        for (pixels in frames) {
+            var i = 0
+            while (i < pixelCount) {
+                val argb = pixels[i]
+                if ((argb ushr 24) != 0) samples.add(argb and 0xFFFFFF)
+                i += step
+            }
+        }
+        return samples.toIntArray()
+    }
+
+    private fun writeLoopExtension(out: ByteSink) {
+        out.byte(0x21)
+        out.byte(0xFF)
+        out.byte(11)
+        out.ascii("NETSCAPE2.0")
+        out.byte(3)
+        out.byte(1)
+        out.u16(0) // 无限循环
+        out.byte(0)
+    }
+
+    private fun writeGraphicControl(out: ByteSink, delayCentiseconds: Int) {
+        out.byte(0x21)
+        out.byte(0xF9)
+        out.byte(4)
+        out.byte(0x04) // 处置方式 = 保留当前帧
+        out.u16(delayCentiseconds.coerceAtLeast(0))
+        out.byte(0)    // 透明色索引
+        out.byte(0)
+    }
+
+    private fun writeImageDescriptor(out: ByteSink, width: Int, height: Int) {
         out.byte(0x2C)
         out.u16(0)
         out.u16(0)
         out.u16(width)
         out.u16(height)
         out.byte(0)
-        // LZW 数据
+    }
+
+    private fun writeImageData(out: ByteSink, indices: ByteArray) {
         val compressed = lzw(indices, 8)
         out.byte(8)
         var offset = 0
@@ -54,26 +120,13 @@ object GifWriter {
             offset += size
         }
         out.byte(0)
-        out.byte(0x3B)
-        return out.toByteArray()
     }
 
-    private const val MaxColors = 256
-
-    /** 中位切分量化：采样 → 反复按最长通道切分 → 每箱取平均色。 */
-    private fun quantize(pixels: IntArray, count: Int, maxColors: Int): IntArray {
-        val step = maxOf(1, count / 40000)
-        val samples = ArrayList<Int>(count / step + 1)
-        var i = 0
-        while (i < count) {
-            val argb = pixels[i]
-            if ((argb ushr 24) != 0) samples.add(argb and 0xFFFFFF)
-            i += step
-        }
+    /** 中位切分量化：反复按颜色跨度最大的箱子切分，每箱取平均色。 */
+    private fun quantize(samples: IntArray, maxColors: Int): IntArray {
         if (samples.isEmpty()) return intArrayOf(0)
-        var boxes = listOf(samples.toIntArray())
+        var boxes = listOf(samples)
         while (boxes.size < maxColors) {
-            // 每次切“颜色跨度最大”的那个箱子，调色板才不会挤在局部
             var splitIndex = -1
             var widest = -1
             boxes.forEachIndexed { index, box ->
@@ -107,7 +160,9 @@ object GifWriter {
                 b += color and 0xFF
             }
             val n = box.size.coerceAtLeast(1)
-            (((r / n).toInt() and 0xFF) shl 16) or (((g / n).toInt() and 0xFF) shl 8) or ((b / n).toInt() and 0xFF)
+            (((r / n).toInt() and 0xFF) shl 16) or
+                (((g / n).toInt() and 0xFF) shl 8) or
+                ((b / n).toInt() and 0xFF)
         }
     }
 

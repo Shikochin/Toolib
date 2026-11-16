@@ -2,7 +2,9 @@ package dev.shiko.toolib.ui.symmetry
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.ImageDecoder
+import android.graphics.drawable.AnimatedImageDrawable
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -29,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +46,8 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.shiko.toolib.R
+import dev.shiko.toolib.logic.AnimatedWebpWriter
+import dev.shiko.toolib.logic.GifWriter
 import dev.shiko.toolib.logic.ImageExporter
 import dev.shiko.toolib.logic.ImageFormat
 import dev.shiko.toolib.logic.SaveLocationStore
@@ -51,6 +56,7 @@ import dev.shiko.toolib.logic.SymmetryRenderer
 import dev.shiko.toolib.ui.components.SaveLocationSection
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ui.feice.mochi.basic.MochiButton
@@ -75,6 +81,12 @@ import ui.feice.mochi.theme.MochiTheme
 
 private const val SourceMaxSize = 2400
 private const val PreviewMaxSize = 720
+private const val FrameIntervalMillis = 66L
+
+/** 动图导出：最长边上限 + 每帧 1/100 秒数 + 最多采样的帧数。 */
+private const val AnimatedExportMaxSize = 512
+private const val AnimatedDelayCentiseconds = 7
+private const val AnimatedMaxFrames = 40
 
 /** 对称艺术：选图 → 拖反色线定对称轴 → 实时预览 → 继续对称 / 保存。 */
 @Composable
@@ -90,6 +102,7 @@ fun SymmetryPage(
 
     var source by remember { mutableStateOf<Bitmap?>(null) }
     var previewSource by remember { mutableStateOf<Bitmap?>(null) }
+    var animated by remember { mutableStateOf<AnimatedImageDrawable?>(null) }
     var preview by remember { mutableStateOf<Bitmap?>(null) }
     var mode by remember { mutableStateOf(SymmetryMode.Left) }
     var axisX by remember { mutableFloatStateOf(0.5f) }
@@ -105,15 +118,41 @@ fun SymmetryPage(
         scope.launch {
             busy = true
             val loaded = withContext(Dispatchers.IO) { loadBitmap(context, uri, SourceMaxSize) }
+            val moving = withContext(Dispatchers.IO) { loadAnimated(context, uri) }
             if (loaded == null) {
                 toast.show(resources.getString(R.string.symmetry_load_failed))
             } else {
                 source = loaded
+                animated = moving
                 previewSource = withContext(Dispatchers.Default) {
                     SymmetryRenderer.scaleDown(loaded, PreviewMaxSize)
                 }
             }
             busy = false
+        }
+    }
+
+    // 动图：把 drawable 逐帧画进快照，编辑区和预览都跟着刷新
+    LaunchedEffect(animated) {
+        val drawable = animated ?: return@LaunchedEffect
+        val scale = minOf(1f, PreviewMaxSize.toFloat() / maxOf(drawable.intrinsicWidth, drawable.intrinsicHeight))
+        val width = (drawable.intrinsicWidth * scale).toInt().coerceAtLeast(1)
+        val height = (drawable.intrinsicHeight * scale).toInt().coerceAtLeast(1)
+        val snapshot = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(snapshot)
+        drawable.setBounds(0, 0, width, height)
+        drawable.start()
+        try {
+            var last = 0L
+            while (true) {
+                val now = withFrameMillis { it }
+                if (now - last < FrameIntervalMillis) continue
+                last = now
+                drawable.draw(canvas)
+                previewSource = snapshot.copy(Bitmap.Config.ARGB_8888, false)
+            }
+        } finally {
+            drawable.stop()
         }
     }
 
@@ -130,14 +169,64 @@ fun SymmetryPage(
         store.save(SaveLocationStore.SymmetryTool, treeUri)
     }
 
+    /** 动图取当前帧的全尺寸快照，静态图直接用解码出来的位图。 */
+    fun currentFrame(): Bitmap? {
+        val drawable = animated ?: return source
+        val scale = minOf(1f, SourceMaxSize.toFloat() / maxOf(drawable.intrinsicWidth, drawable.intrinsicHeight))
+        val width = (drawable.intrinsicWidth * scale).toInt().coerceAtLeast(1)
+        val height = (drawable.intrinsicHeight * scale).toInt().coerceAtLeast(1)
+        val snapshot = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, width, height)
+        drawable.draw(Canvas(snapshot))
+        return snapshot
+    }
+
     fun save() {
-        val bitmap = source ?: return
+        val drawable = animated
+        if (drawable == null && source == null) return
         scope.launch {
             busy = true
+            // 动图导出 GIF：先按帧采样（主线程上取，和预览循环串行），再逐帧对称后编码
+            val animatedOutput = drawable != null && (format == ImageFormat.Gif || format == ImageFormat.Webp)
+            val frames = if (animatedOutput) {
+                withContext(Dispatchers.Main.immediate) {
+                    captureFrames(drawable, AnimatedExportMaxSize)
+                }
+            } else {
+                emptyList()
+            }
             val outcome = withContext(Dispatchers.IO) {
                 runCatching {
-                    val rendered = SymmetryRenderer.render(bitmap, mode, axisX, axisY)
-                    val bytes = ImageExporter.encode(rendered, format, quality.toInt())
+                    val rendered = if (frames.isNotEmpty()) {
+                        frames.map { SymmetryRenderer.render(it, mode, axisX, axisY) }
+                    } else {
+                        listOf(SymmetryRenderer.render(currentFrame() ?: error("no frame"), mode, axisX, axisY))
+                    }
+                    val bytes = when {
+                        rendered.size <= 1 -> ImageExporter.encode(rendered.first(), format, quality.toInt())
+                        format == ImageFormat.Gif -> {
+                            val pixels = rendered.map { frame ->
+                                IntArray(frame.width * frame.height).also {
+                                    frame.getPixels(it, 0, frame.width, 0, 0, frame.width, frame.height)
+                                }
+                            }
+                            GifWriter.encodeAnimation(
+                                frames = pixels,
+                                width = rendered.first().width,
+                                height = rendered.first().height,
+                                delayCentiseconds = AnimatedDelayCentiseconds,
+                            )
+                        }
+                        format == ImageFormat.Webp -> AnimatedWebpWriter.encode(
+                            frameFiles = rendered.map { ImageExporter.encodeLosslessWebp(it) },
+                            width = rendered.first().width,
+                            height = rendered.first().height,
+                            durationMillis = AnimatedDelayCentiseconds * 10,
+                        )
+                        else -> ImageExporter.encode(rendered.first(), format, quality.toInt())
+                    }
+                    frames.forEach { it.recycle() }
+                    rendered.forEach { if (!it.isRecycled) it.recycle() }
                     val name = ImageExporter.buildFileName(format)
                     val tree = saveTreeUri?.takeIf { it.isNotBlank() }?.let(Uri::parse)
                     if (tree != null) {
@@ -163,13 +252,14 @@ fun SymmetryPage(
     }
 
     fun applyAndContinue() {
-        val bitmap = source ?: return
+        val bitmap = currentFrame() ?: return
         scope.launch {
             busy = true
             val rendered = withContext(Dispatchers.Default) {
                 SymmetryRenderer.render(bitmap, mode, axisX, axisY)
             }
             source = rendered
+            animated = null
             previewSource = withContext(Dispatchers.Default) { SymmetryRenderer.scaleDown(rendered, PreviewMaxSize) }
             axisX = 0.5f
             axisY = 0.5f
@@ -386,8 +476,9 @@ private fun SymmetryEditor(
     onAxisChange: (Float?, Float?) -> Unit,
 ) {
     val aspect = bitmap.width.toFloat() / bitmap.height.toFloat()
-    val showsVerticalAxis = mode != SymmetryMode.Top && mode != SymmetryMode.Bottom
-    val showsHorizontalAxis = mode == SymmetryMode.Both
+    // 左右对称拖竖线，上下对称拖横线，四向两条都有
+    val showsVerticalAxis = mode == SymmetryMode.Left || mode == SymmetryMode.Right || mode == SymmetryMode.Both
+    val showsHorizontalAxis = mode == SymmetryMode.Top || mode == SymmetryMode.Bottom || mode == SymmetryMode.Both
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -451,6 +542,72 @@ private fun SymmetryEditor(
         }
     }
 }
+
+/**
+ * 按固定间隔把 AnimatedImageDrawable 采样成若干帧，检测到循环（画面回到第一帧）就停。
+ * 必须在主线程调用：预览循环也在主线程画同一个 drawable，串行执行才不会打架。
+ */
+private suspend fun captureFrames(
+    drawable: AnimatedImageDrawable,
+    maxSize: Int,
+    maxFrames: Int = AnimatedMaxFrames,
+    intervalMillis: Long = FrameIntervalMillis,
+): List<Bitmap> {
+    val scale = minOf(1f, maxSize.toFloat() / maxOf(drawable.intrinsicWidth, drawable.intrinsicHeight))
+    val width = (drawable.intrinsicWidth * scale).toInt().coerceAtLeast(1)
+    val height = (drawable.intrinsicHeight * scale).toInt().coerceAtLeast(1)
+    val snapshot = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(snapshot)
+    val frames = mutableListOf<Bitmap>()
+    var first: IntArray? = null
+    drawable.setBounds(0, 0, width, height)
+    drawable.start()
+    try {
+        while (frames.size < maxFrames) {
+            delay(intervalMillis)
+            drawable.draw(canvas)
+            val frame = snapshot.copy(Bitmap.Config.ARGB_8888, false)
+            val signature = signatureOf(frame)
+            val start = first
+            if (start != null && frames.size >= 6 && similarSignature(start, signature)) {
+                frame.recycle()
+                break
+            }
+            if (start == null) first = signature
+            frames.add(frame)
+        }
+    } finally {
+        // 采样只是借这个 drawable 画几帧，结束后要继续播放，否则预览会停在最后一帧
+        drawable.start()
+    }
+    if (frames.isEmpty()) frames.add(snapshot.copy(Bitmap.Config.ARGB_8888, false))
+    return frames
+}
+
+/** 8x8 缩略签名，用来判断动图是否回到第一帧。 */
+private fun signatureOf(bitmap: Bitmap): IntArray {
+    val scaled = Bitmap.createScaledBitmap(bitmap, 8, 8, true)
+    val pixels = IntArray(64)
+    scaled.getPixels(pixels, 0, 8, 0, 0, 8, 8)
+    if (scaled !== bitmap) scaled.recycle()
+    return pixels
+}
+
+private fun similarSignature(a: IntArray, b: IntArray): Boolean {
+    var diff = 0L
+    for (i in a.indices) {
+        diff += kotlin.math.abs(((a[i] shr 16) and 0xFF) - ((b[i] shr 16) and 0xFF))
+        diff += kotlin.math.abs(((a[i] shr 8) and 0xFF) - ((b[i] shr 8) and 0xFF))
+        diff += kotlin.math.abs((a[i] and 0xFF) - (b[i] and 0xFF))
+    }
+    return diff / (a.size * 3) < 10
+}
+
+/** 动图（GIF / 动图 WebP）返回 AnimatedImageDrawable，静态图返回 null。 */
+private fun loadAnimated(context: Context, uri: Uri): AnimatedImageDrawable? = runCatching {
+    val source = ImageDecoder.createSource(context.contentResolver, uri)
+    ImageDecoder.decodeDrawable(source) as? AnimatedImageDrawable
+}.getOrNull()
 
 private fun loadBitmap(context: Context, uri: Uri, maxSize: Int): Bitmap? = runCatching {
     val source = ImageDecoder.createSource(context.contentResolver, uri)
