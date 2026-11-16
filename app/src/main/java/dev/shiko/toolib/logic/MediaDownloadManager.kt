@@ -7,8 +7,8 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
-import android.provider.DocumentsContract
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import dev.shiko.toolib.R
 import java.io.File
@@ -173,7 +173,7 @@ class MediaDownloadManager(private val context: Context) {
             }
             return Result(
                 files = published,
-                directory = if (treeUri != null) treeDisplayPath(treeUri) else "/storage/emulated/0/$relativePath",
+                directory = if (treeUri != null) SafPaths.treeDisplayPath(treeUri) else "/storage/emulated/0/$relativePath",
                 mimeType = named.firstOrNull()?.let { mimeType(it.extension, options.kind) } ?: "",
                 title = payload.optString("title").ifBlank { options.sourceTitle },
                 url = url,
@@ -534,12 +534,6 @@ class MediaDownloadManager(private val context: Context) {
             val first = cleaned.substringBefore('/')
             return if (first in allowed) cleaned else "$root/$cleaned"
         }
-
-        /** 用户挑的文件夹在界面上显示成 "Download/Toolib" 这种形式。 */
-        fun treeDisplayPath(treeUri: Uri): String = runCatching {
-            val id = DocumentsContract.getTreeDocumentId(treeUri)
-            id.substringAfter(':').ifBlank { id }
-        }.getOrDefault(treeUri.toString())
 
         /** 给 UI 显示的完整路径。 */
         fun displaySaveLocation(raw: String?, kind: Kind): String =

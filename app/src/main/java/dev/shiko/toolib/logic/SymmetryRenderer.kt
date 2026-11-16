@@ -3,13 +3,19 @@ package dev.shiko.toolib.logic
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import kotlin.math.max
+import kotlin.math.roundToInt
 
-/** 对称方式：左右镜像、上下镜像，或两者都做（四向对称）。 */
-enum class SymmetryMode { LeftRight, TopBottom, Both }
+/** 对称方式：保留哪一侧，并把这一侧镜像到另一侧。 */
+enum class SymmetryMode { Left, Right, Top, Bottom, Both }
 
 /**
- * 把图片做成对称图：以一条轴为界，保留较大的那一侧，镜像到另一侧。
- * 用 Canvas 的裁剪 + 负缩放实现，不重采样像素，速度只跟图大小有关。
+ * 把图片做成对称图：以反色线为界，取指定的一侧，再把这一侧镜像出来，
+ * 输出只包含"保留的部分 + 它的镜像"，不保留原图其余部分。
+ *
+ * 例：左对称、线在 30% 处 → 输出宽度是原图的 60%，左半是原图左 30%，右半是它的镜像。
  */
 object SymmetryRenderer {
 
@@ -17,11 +23,15 @@ object SymmetryRenderer {
 
     fun render(source: Bitmap, mode: SymmetryMode, axisX: Float, axisY: Float): Bitmap {
         var current = source
-        if (mode == SymmetryMode.LeftRight || mode == SymmetryMode.Both) {
-            current = mirrorHorizontal(current, axisX)
-        }
-        if (mode == SymmetryMode.TopBottom || mode == SymmetryMode.Both) {
-            current = mirrorVertical(current, axisY)
+        when (mode) {
+            SymmetryMode.Left -> current = mirrorHorizontal(current, axisX, keepLeft = true)
+            SymmetryMode.Right -> current = mirrorHorizontal(current, axisX, keepLeft = false)
+            SymmetryMode.Top -> current = mirrorVertical(current, axisY, keepTop = true)
+            SymmetryMode.Bottom -> current = mirrorVertical(current, axisY, keepTop = false)
+            SymmetryMode.Both -> {
+                current = mirrorHorizontal(current, axisX, keepLeft = true)
+                current = mirrorVertical(current, axisY, keepTop = true)
+            }
         }
         if (current === source) {
             current = source.copy(Bitmap.Config.ARGB_8888, false)
@@ -29,41 +39,47 @@ object SymmetryRenderer {
         return current
     }
 
-    private fun mirrorHorizontal(source: Bitmap, axisFraction: Float): Bitmap {
+    private fun mirrorHorizontal(source: Bitmap, axisFraction: Float, keepLeft: Boolean): Bitmap {
         val width = source.width
         val height = source.height
-        val axis = (axisFraction.coerceIn(0.02f, 0.98f) * width)
-        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val axis = (axisFraction.coerceIn(0.02f, 0.98f) * width).roundToInt()
+        val keepWidth = if (keepLeft) axis else width - axis
+        if (keepWidth <= 0) return source.copy(Bitmap.Config.ARGB_8888, false)
+        val output = Bitmap.createBitmap(keepWidth * 2, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
-        canvas.drawBitmap(source, 0f, 0f, paint)
-        canvas.save()
-        // 保留大的那半，把镜像画到小的那半上
-        if (axis >= width / 2f) {
-            canvas.clipRect(0f, 0f, axis, height.toFloat())
+        val src = if (keepLeft) Rect(0, 0, axis, height) else Rect(axis, 0, width, height)
+        val dst = if (keepLeft) {
+            RectF(0f, 0f, keepWidth.toFloat(), height.toFloat())
         } else {
-            canvas.clipRect(axis, 0f, width.toFloat(), height.toFloat())
+            RectF(keepWidth.toFloat(), 0f, (keepWidth * 2).toFloat(), height.toFloat())
         }
-        canvas.scale(-1f, 1f, axis, 0f)
-        canvas.drawBitmap(source, 0f, 0f, paint)
+        canvas.drawBitmap(source, src, dst, paint)
+        canvas.save()
+        // 以拼接缝为轴翻转，把保留的部分镜像到另一半
+        canvas.scale(-1f, 1f, keepWidth.toFloat(), 0f)
+        canvas.drawBitmap(source, src, dst, paint)
         canvas.restore()
         return output
     }
 
-    private fun mirrorVertical(source: Bitmap, axisFraction: Float): Bitmap {
+    private fun mirrorVertical(source: Bitmap, axisFraction: Float, keepTop: Boolean): Bitmap {
         val width = source.width
         val height = source.height
-        val axis = (axisFraction.coerceIn(0.02f, 0.98f) * height)
-        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val axis = (axisFraction.coerceIn(0.02f, 0.98f) * height).roundToInt()
+        val keepHeight = if (keepTop) axis else height - axis
+        if (keepHeight <= 0) return source.copy(Bitmap.Config.ARGB_8888, false)
+        val output = Bitmap.createBitmap(width, keepHeight * 2, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
-        canvas.drawBitmap(source, 0f, 0f, paint)
-        canvas.save()
-        if (axis >= height / 2f) {
-            canvas.clipRect(0f, 0f, width.toFloat(), axis)
+        val src = if (keepTop) Rect(0, 0, width, axis) else Rect(0, axis, width, height)
+        val dst = if (keepTop) {
+            RectF(0f, 0f, width.toFloat(), keepHeight.toFloat())
         } else {
-            canvas.clipRect(0f, axis, width.toFloat(), height.toFloat())
+            RectF(0f, keepHeight.toFloat(), width.toFloat(), (keepHeight * 2).toFloat())
         }
-        canvas.scale(1f, -1f, 0f, axis)
-        canvas.drawBitmap(source, 0f, 0f, paint)
+        canvas.drawBitmap(source, src, dst, paint)
+        canvas.save()
+        canvas.scale(1f, -1f, 0f, keepHeight.toFloat())
+        canvas.drawBitmap(source, src, dst, paint)
         canvas.restore()
         return output
     }
@@ -73,8 +89,8 @@ object SymmetryRenderer {
         val longest = maxOf(source.width, source.height)
         if (longest <= maxSize) return source
         val scale = maxSize.toFloat() / longest
-        val width = (source.width * scale).toInt().coerceAtLeast(1)
-        val height = (source.height * scale).toInt().coerceAtLeast(1)
+        val width = max(1, (source.width * scale).toInt())
+        val height = max(1, (source.height * scale).toInt())
         return Bitmap.createScaledBitmap(source, width, height, true)
     }
 }

@@ -1,7 +1,5 @@
 package dev.shiko.toolib.ui.media
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +30,7 @@ import dev.shiko.toolib.logic.MediaDownloadManager
 import dev.shiko.toolib.logic.formatSpeed
 import dev.shiko.toolib.logic.formatTimestamp
 import dev.shiko.toolib.ui.components.MediaPreviewCard
+import dev.shiko.toolib.ui.components.SaveLocationSection
 import dev.shiko.toolib.ui.components.MochiRangeSlider
 import kotlinx.collections.immutable.persistentListOf
 import ui.feice.mochi.basic.MochiDialog
@@ -67,17 +66,6 @@ internal fun MediaConfigureStage(
 ) {
     val context = LocalContext.current
     val kind = if (state.kindIndex == 0) MediaDownloadManager.Kind.VIDEO else MediaDownloadManager.Kind.AUDIO
-    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                )
-            }
-            onStateChange(state.copy(saveTreeUri = uri.toString()))
-        }
-    }
     val videoLabel = stringResource(R.string.media_format_video_label)
     val audioLabel = stringResource(R.string.media_format_audio_label)
     val downloading = status.phase == MediaDownloadPhase.Downloading
@@ -110,22 +98,6 @@ internal fun MediaConfigureStage(
                     onClick = onSelectFormat,
                     chevron = true,
                 )
-                MochiListRow(
-                    title = stringResource(R.string.media_save_location_title),
-                    subtitle = state.saveTreeUri
-                        ?.let { uri -> MediaDownloadManager.treeDisplayPath(Uri.parse(uri)) }
-                        ?: MediaDownloadManager.displaySaveLocation(null, kind),
-                    leading = { MochiIonicon("folder-open", style = MochiIconStyle.Filled) },
-                    chevron = true,
-                    onClick = { folderPicker.launch(null) },
-                )
-                if (state.saveTreeUri != null) {
-                    MochiListRow(
-                        title = stringResource(R.string.media_save_location_reset),
-                        leading = { MochiIonicon("refresh", style = MochiIconStyle.Filled) },
-                        onClick = { onStateChange(state.copy(saveTreeUri = null)) },
-                    )
-                }
                 if (info.isPlaylist) {
                     MochiListRow(
                         stringResource(R.string.media_playlist_entries),
@@ -164,6 +136,13 @@ internal fun MediaConfigureStage(
                     )
                 }
             }
+        }
+        item {
+            SaveLocationSection(
+                treeUri = state.saveTreeUri,
+                defaultLabel = MediaDownloadManager.displaySaveLocation(null, kind),
+                onTreeUriChange = { onStateChange(state.copy(saveTreeUri = it)) },
+            )
         }
         item {
             MochiListSection(header = stringResource(R.string.media_section_video_processing)) {

@@ -9,9 +9,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.shiko.toolib.R
-import dev.shiko.toolib.logic.PermissionLevel
-import dev.shiko.toolib.logic.PermissionSnapshot
-import dev.shiko.toolib.ui.components.ToolHeaderCard
 import ui.feice.mochi.basic.MochiButton
 import ui.feice.mochi.basic.MochiButtonStyle
 import ui.feice.mochi.basic.MochiTextField
@@ -26,24 +23,16 @@ import ui.feice.mochi.navigation.MochiLazyCompactTitleScaffold
 /** First stage: paste a link and inspect it. */
 @Composable
 internal fun MediaInputStage(
+    header: @Composable () -> Unit,
     url: String,
     inspecting: Boolean,
     error: String?,
-    permissions: PermissionSnapshot,
     onUrlChange: (String) -> Unit,
     onInspect: () -> Unit,
     onBack: () -> Unit,
 ) {
     MochiLazyCompactTitleScaffold(title = "", navigationIcon = { MochiBackButton(onClick = onBack) }) {
-        item {
-            ToolHeaderCard(
-                title = stringResource(R.string.media_title),
-                description = stringResource(R.string.media_description),
-                icon = "download",
-                permission = PermissionLevel.NONE,
-                permissions = permissions,
-            )
-        }
+        item { header() }
         item {
             MochiListSection(header = stringResource(R.string.media_section_link)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

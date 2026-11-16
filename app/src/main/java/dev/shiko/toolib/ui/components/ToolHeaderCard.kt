@@ -17,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.shiko.toolib.logic.PermissionLevel
 import dev.shiko.toolib.logic.PermissionSnapshot
+import dev.shiko.toolib.logic.ToolDefinition
 import dev.shiko.toolib.logic.isAvailable
 import ui.feice.mochi.basic.Text
 import ui.feice.mochi.icons.MochiIconStyle
@@ -28,6 +29,18 @@ import ui.feice.mochi.theme.MochiDefaults
 import ui.feice.mochi.theme.MochiTheme
 
 private val ToolIntroIconShape: Shape = MochiSuperellipse(5f)
+
+/** 每个工具页顶部的统一卡片：直接用工具注册表里的条目。 */
+@Composable
+fun ToolHeaderCard(tool: ToolDefinition, permissions: PermissionSnapshot) {
+    ToolHeaderCard(
+        title = stringResource(tool.titleRes),
+        description = stringResource(tool.descriptionRes),
+        icon = tool.icon,
+        permission = tool.permission,
+        permissions = permissions,
+    )
+}
 
 /** Large header card used at the top of a tool page. */
 @Composable

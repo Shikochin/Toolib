@@ -33,6 +33,7 @@ import dev.shiko.toolib.logic.ToolDefinition
 import dev.shiko.toolib.logic.pollPermissionSnapshot
 import dev.shiko.toolib.ui.about.AboutPage
 import dev.shiko.toolib.ui.components.ToolCard
+import dev.shiko.toolib.ui.components.ToolHeaderCard
 import dev.shiko.toolib.ui.media.MediaDownloadFlowPage
 import dev.shiko.toolib.ui.settings.AppearancePage
 import dev.shiko.toolib.ui.settings.LicensePage
@@ -119,13 +120,25 @@ private fun ToolibApp() {
                         route == AboutRoute -> AboutPage(onOpenLicense = { navigator.push(LicenseRoute) })
                         route == LicenseRoute -> LicensePage()
                         route == AppearanceRoute -> AppearancePage(themeSettings, ::updateTheme)
-                        route.startsWith(ToolRoutePrefix) -> when (ToolCatalog.find(route.removePrefix(ToolRoutePrefix))?.id) {
-                            ToolCatalog.MEDIA_DOWNLOAD_ID -> MediaDownloadFlowPage(
-                                onBack = { navigator.pop() },
-                                permissions = permissions,
-                            )
-                            ToolCatalog.SYMMETRY_ID -> SymmetryPage(onBack = { navigator.pop() })
-                            else -> Unit
+                        route.startsWith(ToolRoutePrefix) -> {
+                            val tool = ToolCatalog.find(route.removePrefix(ToolRoutePrefix))
+                            if (tool != null) {
+                                // 每个工具页都强制拿到同一张顶部卡片
+                                val header: @Composable () -> Unit = {
+                                    ToolHeaderCard(tool, permissions)
+                                }
+                                when (tool.id) {
+                                    ToolCatalog.MEDIA_DOWNLOAD_ID -> MediaDownloadFlowPage(
+                                        header = header,
+                                        onBack = { navigator.pop() },
+                                    )
+                                    ToolCatalog.SYMMETRY_ID -> SymmetryPage(
+                                        header = header,
+                                        onBack = { navigator.pop() },
+                                    )
+                                    else -> Unit
+                                }
+                            }
                         }
                     }
                 }

@@ -10,7 +10,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import dev.shiko.toolib.logic.MediaDownloadManager
-import dev.shiko.toolib.logic.PermissionSnapshot
 import dev.shiko.toolib.logic.formatTimestamp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,8 +26,8 @@ private enum class MediaFlowStage { Input, Playlist, Configure, Formats }
  */
 @Composable
 fun MediaDownloadFlowPage(
+    header: @Composable () -> Unit,
     onBack: () -> Unit = {},
-    permissions: PermissionSnapshot = PermissionSnapshot(),
 ) {
     val context = LocalContext.current
     val manager = remember(context) { MediaDownloadManager(context) }
@@ -135,10 +134,10 @@ fun MediaDownloadFlowPage(
     MochiNavHost(mediaNavigator, Modifier.fillMaxSize()) { route ->
         when (MediaFlowStage.valueOf(route)) {
             MediaFlowStage.Input -> MediaInputStage(
+                header = header,
                 url = url,
                 inspecting = inspecting,
                 error = inspectError,
-                permissions = permissions,
                 onUrlChange = { url = it },
                 onInspect = ::inspectUrl,
                 onBack = ::navigateBack,
