@@ -16,10 +16,6 @@
     <string name="settings_appearance_subtitle">主題、顏色、手勢、縮放與 HDR</string>
     <string name="settings_section_permissions">權限</string>
     <string name="settings_section_about">關於</string>
-    <string name="settings_github_title">GitHub 儲存庫</string>
-    <string name="settings_github_subtitle">原始碼、問題追蹤與最新版本</string>
-    <string name="settings_license_title">開放原始碼授權</string>
-    <string name="settings_license_subtitle">Toolib 及其相依元件的授權資訊</string>
 
     <!-- Permission levels -->
     <string name="permission_none_title">無需權限</string>
@@ -63,6 +59,22 @@
     <string name="license_section_dependencies">相依元件授權</string>
     <string name="license_dependencies_footer">此清單由應用程式的相依性設定產生。</string>
 
+    <!-- About -->
+    <string name="about_title">關於</string>
+    <string name="about_tagline">輕量的 Android 工具集</string>
+    <string name="about_section_developer">開發者</string>
+    <string name="about_developer_name">西宮 缄</string>
+    <string name="about_developer_handle">Shikochin</string>
+    <string name="about_developer_footer">Toolib 由西宮 缄設計與維護。</string>
+    <string name="about_section_project">專案</string>
+    <string name="about_repository_title">GitHub 儲存庫</string>
+    <string name="about_repository_subtitle">檢視原始碼、問題回報與最新版本</string>
+    <string name="about_license_title">開放原始碼授權</string>
+    <string name="about_license_subtitle">Toolib 與相依元件的授權資訊</string>
+    <string name="about_footer">由西宮 缄以 ♥ 製作 · MIT</string>
+    <string name="settings_about_title">關於</string>
+    <string name="settings_about_subtitle">開發者、程式碼儲存庫與授權</string>
+
     <!-- Media download -->
     <string name="media_title">媒體下載</string>
     <string name="media_description">從多個平台下載影片與音訊</string>
@@ -91,11 +103,6 @@
         <item quantity="other">已選取 %1$d 個</item>
     </plurals>
     <string name="media_section_download_options">下載選項</string>
-    <string name="media_embed_metadata">嵌入中繼資料</string>
-    <string name="media_embed_thumbnail">嵌入縮圖</string>
-    <string name="media_write_subtitles">下載字幕</string>
-    <string name="media_embed_subtitles">嵌入字幕</string>
-    <string name="media_subtitle_languages">字幕語言</string>
     <string name="media_download_playlist">下載播放清單</string>
     <plurals name="media_playlist_on_subtitle">
         <item quantity="other">下載已選取的 %1$d 個項目</item>
@@ -104,15 +111,19 @@
     <string name="media_section_video_processing">影片處理</string>
     <string name="media_clip_range">片段範圍</string>
     <string name="media_duration_unavailable">無法取得播放長度</string>
+    <string name="media_action_open">開啟</string>
+    <string name="media_action_share">分享</string>
+    <string name="media_save_location_title">儲存位置</string>
+    <string name="media_save_location_reset">使用預設位置</string>
     <string name="media_action_start_download">開始下載</string>
     <string name="media_action_downloading">正在下載…</string>
     <string name="media_download_progress">正在下載 %1$d%%</string>
+    <string name="media_download_progress_speed">下載中 %1$d%% · %2$s</string>
+    <string name="media_stage_muxing">正在合併音訊與視訊…</string>
+    <string name="media_stage_trimming">正在裁剪…</string>
     <string name="media_download_complete">下載完成</string>
     <string name="media_action_retry_download">重試下載</string>
     <string name="media_download_failed">下載失敗</string>
-    <plurals name="media_download_saved">
-        <item quantity="other">下載完成，已儲存 %1$d 個檔案</item>
-    </plurals>
     <string name="media_format_title">選擇格式</string>
     <string name="media_section_format">格式</string>
     <string name="media_best_quality_subtitle">自動選擇可用的最佳品質</string>

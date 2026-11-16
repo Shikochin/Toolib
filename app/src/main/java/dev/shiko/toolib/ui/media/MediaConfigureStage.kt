@@ -1,25 +1,42 @@
 package dev.shiko.toolib.ui.media
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import dev.shiko.toolib.R
 import dev.shiko.toolib.logic.MediaDownloadManager
+import dev.shiko.toolib.logic.formatSpeed
 import dev.shiko.toolib.logic.formatTimestamp
 import dev.shiko.toolib.ui.components.MediaPreviewCard
 import dev.shiko.toolib.ui.components.MochiRangeSlider
 import kotlinx.collections.immutable.persistentListOf
+import ui.feice.mochi.basic.MochiDialog
+import ui.feice.mochi.basic.MochiDialogAction
+import ui.feice.mochi.basic.MochiDialogActionRole
 import ui.feice.mochi.basic.MochiButton
 import ui.feice.mochi.basic.MochiButtonDefaults
 import ui.feice.mochi.basic.MochiButtonStyle
@@ -48,10 +65,24 @@ internal fun MediaConfigureStage(
     onDownload: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val kind = if (state.kindIndex == 0) MediaDownloadManager.Kind.VIDEO else MediaDownloadManager.Kind.AUDIO
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            onStateChange(state.copy(saveTreeUri = uri.toString()))
+        }
+    }
     val videoLabel = stringResource(R.string.media_format_video_label)
     val audioLabel = stringResource(R.string.media_format_audio_label)
     val downloading = status.phase == MediaDownloadPhase.Downloading
 
+    Box(Modifier.fillMaxSize()) {
     MochiLazyLargeTitleScaffold(
         title = stringResource(R.string.media_config_title),
         navigationIcon = { MochiBackButton(onClick = onBack) },
@@ -79,6 +110,22 @@ internal fun MediaConfigureStage(
                     onClick = onSelectFormat,
                     chevron = true,
                 )
+                MochiListRow(
+                    title = stringResource(R.string.media_save_location_title),
+                    subtitle = state.saveTreeUri
+                        ?.let { uri -> MediaDownloadManager.treeDisplayPath(Uri.parse(uri)) }
+                        ?: MediaDownloadManager.displaySaveLocation(null, kind),
+                    leading = { MochiIonicon("folder-open", style = MochiIconStyle.Filled) },
+                    chevron = true,
+                    onClick = { folderPicker.launch(null) },
+                )
+                if (state.saveTreeUri != null) {
+                    MochiListRow(
+                        title = stringResource(R.string.media_save_location_reset),
+                        leading = { MochiIonicon("refresh", style = MochiIconStyle.Filled) },
+                        onClick = { onStateChange(state.copy(saveTreeUri = null)) },
+                    )
+                }
                 if (info.isPlaylist) {
                     MochiListRow(
                         stringResource(R.string.media_playlist_entries),
@@ -98,43 +145,9 @@ internal fun MediaConfigureStage(
                 }
             }
         }
-        item {
-            MochiListSection(header = stringResource(R.string.media_section_download_options)) {
-                MochiListRow(
-                    stringResource(R.string.media_embed_metadata),
-                    trailing = { MochiSwitch(state.embedMetadata, { onStateChange(state.copy(embedMetadata = it)) }) },
-                    leading = { MochiIonicon("information-circle", style = MochiIconStyle.Filled) },
-                )
-                MochiListRow(
-                    stringResource(R.string.media_embed_thumbnail),
-                    trailing = { MochiSwitch(state.embedThumbnail, { onStateChange(state.copy(embedThumbnail = it)) }) },
-                    leading = { MochiIonicon("image", style = MochiIconStyle.Filled) },
-                )
-                MochiListRow(
-                    stringResource(R.string.media_write_subtitles),
-                    trailing = { MochiSwitch(state.writeSubtitles, { onStateChange(state.copy(writeSubtitles = it)) }) },
-                    leading = { MochiIonicon("text", style = MochiIconStyle.Filled) },
-                )
-                if (state.writeSubtitles) {
-                    MochiListRow(
-                        stringResource(R.string.media_embed_subtitles),
-                        trailing = { MochiSwitch(state.embedSubtitles, { onStateChange(state.copy(embedSubtitles = it)) }) },
-                        leading = { MochiIonicon("text", style = MochiIconStyle.Filled) },
-                    )
-                    MochiListRow(
-                        stringResource(R.string.media_subtitle_languages),
-                        trailing = {
-                            MochiTextField(
-                                state.subtitleLanguages,
-                                { onStateChange(state.copy(subtitleLanguages = it)) },
-                                modifier = Modifier.width(150.dp),
-                                clearButton = false,
-                            )
-                        },
-                        leading = { MochiIonicon("language", style = MochiIconStyle.Filled) },
-                    )
-                }
-                if (info.isPlaylist) {
+        if (info.isPlaylist) {
+            item {
+                MochiListSection(header = stringResource(R.string.media_section_download_options)) {
                     MochiListRow(
                         stringResource(R.string.media_download_playlist),
                         subtitle = if (state.playlistEnabled) {
@@ -174,6 +187,33 @@ internal fun MediaConfigureStage(
                 )
             }
         }
+        if (status.phase == MediaDownloadPhase.Completed && status.files.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    MochiButton(
+                        onClick = { shareMedia(context, status.files.first(), status.mimeType) },
+                        modifier = Modifier.weight(1f),
+                        style = MochiButtonStyle.Filled,
+                    ) {
+                        MochiIonicon("share-social", style = MochiIconStyle.Filled)
+                        Text(stringResource(R.string.media_action_share))
+                    }
+                    MochiButton(
+                        onClick = { openMedia(context, status.files.first(), status.mimeType) },
+                        modifier = Modifier.weight(1f),
+                        style = MochiButtonStyle.Outlined,
+                    ) {
+                        MochiIonicon("open", style = MochiIconStyle.Filled)
+                        Text(stringResource(R.string.media_action_open))
+                    }
+                }
+            }
+        } else {
         item {
             val buttonColors = MochiButtonDefaults.colors(MochiButtonStyle.Filled).copy(
                 container = Color.Transparent,
@@ -184,6 +224,7 @@ internal fun MediaConfigureStage(
                 disabledContent = MochiTheme.colorScheme.onSurface.copy(alpha = 0.38f),
             )
             val progressFillColor = MochiTheme.colorScheme.primaryContainer
+            val busy = status.phase.isBusy()
             MochiButton(
                 onClick = onDownload,
                 modifier = Modifier
@@ -192,9 +233,11 @@ internal fun MediaConfigureStage(
                     .clip(MochiRoundedRectangle(MochiButtonDefaults.Height / 2))
                     .background(MochiTheme.colorScheme.surfaceVariant)
                     .drawBehind {
-                        val fraction = when {
-                            downloading -> status.progress.coerceIn(0f, 1f)
-                            status.phase == MediaDownloadPhase.Completed -> 1f
+                        val fraction = when (status.phase) {
+                            MediaDownloadPhase.Downloading -> status.progress.coerceIn(0f, 1f)
+                            // 合并 / 裁剪没有真实进度：整块强调色铺满，不动
+                            MediaDownloadPhase.Muxing, MediaDownloadPhase.Trimming -> 1f
+                            MediaDownloadPhase.Completed -> 1f
                             else -> 0f
                         }
                         if (fraction > 0f) {
@@ -205,54 +248,73 @@ internal fun MediaConfigureStage(
                             )
                         }
                     },
-                enabled = !downloading,
+                enabled = !busy,
                 colors = buttonColors,
                 style = MochiButtonStyle.Filled,
             ) {
                 MochiIonicon("download", style = MochiIconStyle.Filled)
+                Text(downloadButtonLabel(status))
+            }
+        }
+        }
+        if (status.phase == MediaDownloadPhase.Failed && status.error != null) {
+            item {
                 Text(
-                    when {
-                        downloading -> stringResource(
-                            R.string.media_download_progress,
-                            (status.progress * 100).toInt(),
-                        )
-                        status.phase == MediaDownloadPhase.Completed -> stringResource(R.string.media_download_complete)
-                        status.phase == MediaDownloadPhase.Failed -> stringResource(R.string.media_action_retry_download)
-                        else -> stringResource(R.string.media_action_start_download)
-                    },
+                    status.error,
+                    style = MochiTheme.textStyles.footnote,
+                    color = MochiTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 4.dp),
                 )
             }
         }
-        if (status.phase != MediaDownloadPhase.Idle) {
-            item {
-                MochiListSection(header = stringResource(R.string.media_section_status)) {
-                    val failed = status.phase == MediaDownloadPhase.Failed
-                    val completed = status.phase == MediaDownloadPhase.Completed
-                    MochiListRow(
-                        title = when (status.phase) {
-                            MediaDownloadPhase.Completed -> pluralStringResource(
-                                R.plurals.media_download_saved,
-                                status.savedFileCount,
-                                status.savedFileCount,
-                            )
-                            MediaDownloadPhase.Failed -> stringResource(R.string.media_download_failed)
-                            else -> stringResource(R.string.media_action_downloading)
-                        },
-                        subtitle = status.error ?: status.logLine,
-                        leading = {
-                            MochiIonicon(
-                                when {
-                                    failed -> "close-circle"
-                                    completed -> "checkmark-circle"
-                                    else -> "information-circle"
-                                },
-                                style = MochiIconStyle.Filled,
-                                tint = if (failed) MochiTheme.colorScheme.error else MochiTheme.colorScheme.primary,
-                            )
-                        },
-                    )
-                }
-            }
+    }
+    }
+}
+
+/** 下载中 / 后处理中：按钮不可点，并且显示进度。 */
+private fun MediaDownloadPhase.isBusy(): Boolean = this == MediaDownloadPhase.Downloading ||
+    this == MediaDownloadPhase.Muxing ||
+    this == MediaDownloadPhase.Trimming
+
+/** 按钮上的文案：直接反映当前阶段。 */
+@Composable
+private fun downloadButtonLabel(status: MediaDownloadStatus): String = when (status.phase) {
+    MediaDownloadPhase.Downloading -> {
+        val percent = (status.progress * 100).toInt().coerceIn(0, 100)
+        if (status.speedBytesPerSecond > 0) {
+            stringResource(
+                R.string.media_download_progress_speed,
+                percent,
+                formatSpeed(status.speedBytesPerSecond),
+            )
+        } else {
+            stringResource(R.string.media_download_progress, percent)
         }
     }
+    MediaDownloadPhase.Muxing -> stringResource(R.string.media_stage_muxing)
+    MediaDownloadPhase.Trimming -> stringResource(R.string.media_stage_trimming)
+    MediaDownloadPhase.Completed -> stringResource(R.string.media_download_complete)
+    MediaDownloadPhase.Failed -> stringResource(R.string.media_action_retry_download)
+    MediaDownloadPhase.Idle -> stringResource(R.string.media_action_start_download)
+}
+
+/** 用系统应用打开刚下载的文件。 */
+private fun openMedia(context: Context, uri: Uri, mimeType: String) {
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mimeType.ifBlank { "*/*" })
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching { context.startActivity(intent) }
+}
+
+/** 分享刚下载的文件。 */
+private fun shareMedia(context: Context, uri: Uri, mimeType: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = mimeType.ifBlank { "*/*" }
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching { context.startActivity(Intent.createChooser(intent, null)) }
 }

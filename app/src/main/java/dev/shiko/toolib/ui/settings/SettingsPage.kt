@@ -20,8 +20,7 @@ import ui.feice.mochi.theme.MochiTheme
 fun SettingsPage(
     permissions: PermissionSnapshot,
     onOpenAppearance: () -> Unit,
-    onOpenGithub: () -> Unit,
-    onOpenLicense: () -> Unit,
+    onOpenAbout: () -> Unit,
     onRequestShell: () -> Unit,
 ) {
     MochiLazyLargeTitleScaffold(title = stringResource(R.string.settings_title)) {
@@ -49,18 +48,11 @@ fun SettingsPage(
         item {
             MochiListSection(header = stringResource(R.string.settings_section_about)) {
                 MochiListRow(
-                    title = stringResource(R.string.settings_github_title),
-                    subtitle = stringResource(R.string.settings_github_subtitle),
-                    leading = { MochiIonicon("logo-github", style = MochiIconStyle.Filled) },
+                    title = stringResource(R.string.settings_about_title),
+                    subtitle = stringResource(R.string.settings_about_subtitle),
+                    leading = { MochiIonicon("information-circle", style = MochiIconStyle.Filled) },
                     chevron = true,
-                    onClick = onOpenGithub,
-                )
-                MochiListRow(
-                    title = stringResource(R.string.settings_license_title),
-                    subtitle = stringResource(R.string.settings_license_subtitle),
-                    leading = { MochiIonicon("document-text", style = MochiIconStyle.Filled) },
-                    chevron = true,
-                    onClick = onOpenLicense,
+                    onClick = onOpenAbout,
                 )
             }
         }

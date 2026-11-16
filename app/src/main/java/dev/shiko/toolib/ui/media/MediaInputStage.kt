@@ -18,9 +18,9 @@ import ui.feice.mochi.basic.MochiTextField
 import ui.feice.mochi.basic.Text
 import ui.feice.mochi.icons.MochiIconStyle
 import ui.feice.mochi.icons.MochiIonicon
-import ui.feice.mochi.list.MochiListRow
 import ui.feice.mochi.list.MochiListSection
 import ui.feice.mochi.navigation.MochiBackButton
+import ui.feice.mochi.theme.MochiTheme
 import ui.feice.mochi.navigation.MochiLazyCompactTitleScaffold
 
 /** First stage: paste a link and inspect it. */
@@ -71,22 +71,16 @@ internal fun MediaInputStage(
                 }
             }
         }
-        if (inspecting || error != null) {
+        if (error != null) {
             item {
-                MochiListSection(header = stringResource(R.string.media_section_status)) {
-                    MochiListRow(
-                        title = stringResource(
-                            if (error == null) R.string.media_action_inspecting else R.string.media_status_inspect_failed,
-                        ),
-                        subtitle = error,
-                        leading = {
-                            MochiIonicon(
-                                if (error == null) "information-circle" else "close-circle",
-                                style = MochiIconStyle.Filled,
-                            )
-                        },
-                    )
-                }
+                Text(
+                    error,
+                    style = MochiTheme.textStyles.footnote,
+                    color = MochiTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 4.dp),
+                )
             }
         }
     }

@@ -80,22 +80,17 @@ fun MediaDownloadFlowPage(
         val kind = if (configure.kindIndex == 0) MediaDownloadManager.Kind.VIDEO else MediaDownloadManager.Kind.AUDIO
         val duration = info.duration.toFloat()
         val hasClip = duration > 0f && (configure.clipRange.start > 0f || configure.clipRange.endInclusive < duration)
-        val selectedFormat = configure.selectedFormat?.takeIf { it.isNotBlank() }?.let { id ->
-            val format = info.formats.firstOrNull { it.id == id }
-            if (format?.hasVideo == true && !format.hasAudio) "$id+bestaudio[ext=m4a]/$id" else id
-        }
+        val pickedFormat = configure.selectedFormat?.takeIf { it.isNotBlank() }
+        val pickedInfo = pickedFormat?.let { id -> info.formats.firstOrNull { it.id == id } }
         val options = MediaDownloadManager.Options(
             kind = kind,
-            selectedFormat = selectedFormat,
+            selectedFormat = pickedFormat,
+            selectedHasAudio = pickedInfo?.hasAudio ?: true,
             playlist = configure.playlistEnabled,
             playlistItems = if (configure.playlistEnabled) selectedPlaylist.toList().sorted() else emptyList(),
-            embedMetadata = configure.embedMetadata,
-            embedThumbnail = configure.embedThumbnail,
-            writeSubtitles = configure.writeSubtitles,
-            embedSubtitles = configure.embedSubtitles,
-            subtitleLanguages = configure.subtitleLanguages.ifBlank { "all" },
             clipStart = if (hasClip) formatTimestamp(configure.clipRange.start.toLong()) else "",
             clipEnd = if (hasClip) formatTimestamp(configure.clipRange.endInclusive.toLong()) else "",
+            saveTreeUri = configure.saveTreeUri,
             sourceTitle = info.title,
             sourceUploader = info.uploader,
             sourceThumbnail = info.thumbnail,
@@ -108,7 +103,17 @@ fun MediaDownloadFlowPage(
                         when (event) {
                             is MediaDownloadManager.Event.Progress -> status = status.copy(
                                 progress = (event.progressPercent / 100f).coerceIn(0f, 1f),
-                                logLine = event.line.takeLast(180),
+                                speedBytesPerSecond = event.speedBytesPerSecond,
+                                logLine = event.line.takeLast(180).ifBlank { null },
+                            )
+                            is MediaDownloadManager.Event.StageChanged -> status = status.copy(
+                                phase = when (event.stage) {
+                                    MediaDownloadManager.Stage.Muxing -> MediaDownloadPhase.Muxing
+                                    MediaDownloadManager.Stage.Trimming -> MediaDownloadPhase.Trimming
+                                },
+                                progress = 0f,
+                                speedBytesPerSecond = 0L,
+                                logLine = null,
                             )
                             is MediaDownloadManager.Event.Output -> status = status.copy(logLine = event.line.takeLast(180))
                             else -> Unit
@@ -118,7 +123,8 @@ fun MediaDownloadFlowPage(
                 status = status.copy(
                     phase = MediaDownloadPhase.Completed,
                     progress = 1f,
-                    savedFileCount = result.files.size,
+                    files = result.files,
+                    mimeType = result.mimeType,
                 )
             } catch (cause: Throwable) {
                 status = status.copy(phase = MediaDownloadPhase.Failed, error = cause.message)

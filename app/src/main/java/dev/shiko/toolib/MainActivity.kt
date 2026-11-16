@@ -1,7 +1,5 @@
 package dev.shiko.toolib
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -33,6 +31,7 @@ import dev.shiko.toolib.logic.ThemeSettings
 import dev.shiko.toolib.logic.ToolCatalog
 import dev.shiko.toolib.logic.ToolDefinition
 import dev.shiko.toolib.logic.pollPermissionSnapshot
+import dev.shiko.toolib.ui.about.AboutPage
 import dev.shiko.toolib.ui.components.ToolCard
 import dev.shiko.toolib.ui.media.MediaDownloadFlowPage
 import dev.shiko.toolib.ui.settings.AppearancePage
@@ -64,9 +63,9 @@ class MainActivity : ComponentActivity() {
 
 private const val RootRoute = "root"
 private const val ToolRoutePrefix = "tool/"
+private const val AboutRoute = "about"
 private const val LicenseRoute = "license"
 private const val AppearanceRoute = "appearance"
-private const val GithubUrl = "https://github.com/shiko/Toolib"
 
 @Composable
 private fun ToolibApp() {
@@ -113,10 +112,10 @@ private fun ToolibApp() {
                             permissions = permissions,
                             onOpenAppearance = { navigator.push(AppearanceRoute) },
                             onToolClick = { tool -> navigator.push(ToolRoutePrefix + tool.id, from = ToolCatalog.source(tool)) },
-                            onOpenGithub = { openUrl(context, GithubUrl) },
-                            onOpenLicense = { navigator.push(LicenseRoute) },
+                            onOpenAbout = { navigator.push(AboutRoute) },
                             onRequestShell = { ShizukuPermissionRequest.request { permissions = PermissionProbe.snapshot() } },
                         )
+                        route == AboutRoute -> AboutPage(onOpenLicense = { navigator.push(LicenseRoute) })
                         route == LicenseRoute -> LicensePage()
                         route == AppearanceRoute -> AppearancePage(themeSettings, ::updateTheme)
                         route.startsWith(ToolRoutePrefix) -> {
@@ -141,8 +140,7 @@ private fun RootPage(
     permissions: PermissionSnapshot,
     onOpenAppearance: () -> Unit,
     onToolClick: (ToolDefinition) -> Unit,
-    onOpenGithub: () -> Unit,
-    onOpenLicense: () -> Unit,
+    onOpenAbout: () -> Unit,
     onRequestShell: () -> Unit,
 ) {
     val toolsLabel = stringResource(R.string.tab_tools)
@@ -174,8 +172,7 @@ private fun RootPage(
             SettingsPage(
                 permissions = permissions,
                 onOpenAppearance = onOpenAppearance,
-                onOpenGithub = onOpenGithub,
-                onOpenLicense = onOpenLicense,
+                onOpenAbout = onOpenAbout,
                 onRequestShell = onRequestShell,
             )
         }
@@ -215,8 +212,4 @@ private fun LazyListScope.toolRows(
             if (row.size == 1) Spacer(Modifier.weight(1f))
         }
     }
-}
-
-private fun openUrl(context: android.content.Context, url: String) {
-    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
 }

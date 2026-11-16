@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("com.chaquo.python")
 }
 
 android {
@@ -12,11 +13,16 @@ android {
     defaultConfig {
         applicationId = "dev.shiko.toolib"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            // Python 运行时是原生组件；只保留真机 ABI，APK 体积最小
+            abiFilters += "arm64-v8a"
+        }
     }
 
     buildTypes {
@@ -34,9 +40,14 @@ android {
     buildFeatures {
         compose = true
     }
-    packaging {
-        jniLibs {
-            useLegacyPackaging = true
+}
+
+chaquopy {
+    defaultConfig {
+        version = "3.13"
+        buildPython("/opt/homebrew/bin/python3.13")
+        pip {
+            install("yt-dlp")
         }
     }
 }
@@ -52,7 +63,7 @@ val generateLicenseCatalog = tasks.register("generateLicenseCatalog") {
             "androidx.activity" to "Apache-2.0",
             "androidx.compose" to "Apache-2.0",
             "androidx.core" to "Apache-2.0",
-            "io.github.junkfood02.youtubedl-android" to "GPL-3.0",
+            "com.chaquo.python" to "MIT",
         )
         val displayName = mapOf(
             "mochi-compose" to "Mochi Compose",
@@ -62,8 +73,7 @@ val generateLicenseCatalog = tasks.register("generateLicenseCatalog") {
             "activity-compose" to "AndroidX Activity",
             "core-ktx" to "AndroidX Core KTX",
             "compose-bom" to "Jetpack Compose",
-            "library" to "yt-dlp Android Runtime",
-            "ffmpeg" to "FFmpeg Android Runtime",
+            "gradle" to "Chaquopy",
         )
         val dependencies = configurations.getByName("implementation").dependencies
             .mapNotNull { dependency ->
@@ -72,7 +82,7 @@ val generateLicenseCatalog = tasks.register("generateLicenseCatalog") {
                 name to (licenseByGroup[group] ?: "Apache-2.0")
             }
             .distinctBy { it.first }
-            .sortedBy { it.first }
+            .sortedBy { it.first } + listOf("yt-dlp" to "Unlicense", "CPython" to "PSF-2.0")
         output.asFile.apply {
             parentFile.mkdirs()
             writeText(buildString {
@@ -101,8 +111,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation("io.github.feice11:mochi-compose:0.2.0")
     implementation("io.github.feice11:mochi-icons:0.2.0")
-    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
     testImplementation(libs.junit)
