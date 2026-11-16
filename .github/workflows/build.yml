@@ -22,15 +22,18 @@ jobs:
           java-version: '17'
 
       # Chaquopy 在构建时要用与 app 相同版本的 Python 跑 pip（yt-dlp）
-      - name: Set up Python 3.13
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
 
+      # 公开 SDK 仓库里 API 37 的包名是 platforms;android-37.0（没有裸的 android-37，
+      # 直接写 platforms;android-37 会让 sdkmanager 报错、整个 job 挂在这一步）
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-37 build-tools;37.0.0 platform-tools'
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+          accept-android-sdk-licenses: true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
