@@ -119,6 +119,15 @@ object ImageExporter {
     fun defaultDirectoryLabel(): String =
         "/storage/emulated/0/" + Environment.DIRECTORY_PICTURES + "/Toolib"
 
+    /** 输出格式默认跟着输入格式走：GIF → GIF，WebP → WebP，JPEG → JPEG，其余 → PNG。 */
+    fun formatForMime(mimeType: String?): ImageFormat = when (mimeType?.lowercase()) {
+        "image/gif" -> ImageFormat.Gif
+        "image/webp" -> ImageFormat.Webp
+        "image/jpeg", "image/jpg" -> ImageFormat.Jpeg
+        "image/png" -> ImageFormat.Png
+        else -> ImageFormat.Png
+    }
+
     fun buildFileName(format: ImageFormat): String =
         "Toolib-${System.currentTimeMillis()}.${format.extension}"
 }
