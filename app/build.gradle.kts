@@ -1,3 +1,14 @@
+/** 取当前仓库的 commit 数；拿不到（比如导出成 zip 构建）时退回 1。 */
+fun gitCommitCount(projectDir: java.io.File): Int = runCatching {
+    val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
+        .directory(projectDir)
+        .redirectErrorStream(true)
+        .start()
+    val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+    process.waitFor()
+    output.toIntOrNull()?.takeIf { it > 0 } ?: 1
+}.getOrDefault(1)
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -14,7 +25,8 @@ android {
         applicationId = "dev.shiko.toolib"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
+        // versionCode 跟着 git commit 数走，每次提交自动 +1（CI 需要 fetch-depth: 0）
+        versionCode = gitCommitCount(rootProject.projectDir)
         versionName = "0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

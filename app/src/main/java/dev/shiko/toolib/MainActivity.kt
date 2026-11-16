@@ -37,6 +37,7 @@ import dev.shiko.toolib.ui.media.MediaDownloadFlowPage
 import dev.shiko.toolib.ui.settings.AppearancePage
 import dev.shiko.toolib.ui.settings.LicensePage
 import dev.shiko.toolib.ui.settings.SettingsPage
+import dev.shiko.toolib.ui.symmetry.SymmetryPage
 import kotlinx.collections.immutable.persistentListOf
 import ui.feice.mochi.basic.MochiTabItem
 import ui.feice.mochi.effect.overscroll.ProvideMochiOverscroll
@@ -118,14 +119,13 @@ private fun ToolibApp() {
                         route == AboutRoute -> AboutPage(onOpenLicense = { navigator.push(LicenseRoute) })
                         route == LicenseRoute -> LicensePage()
                         route == AppearanceRoute -> AppearancePage(themeSettings, ::updateTheme)
-                        route.startsWith(ToolRoutePrefix) -> {
-                            val tool = ToolCatalog.find(route.removePrefix(ToolRoutePrefix))
-                            if (tool?.id == ToolCatalog.MEDIA_DOWNLOAD_ID) {
-                                MediaDownloadFlowPage(
-                                    onBack = { navigator.pop() },
-                                    permissions = permissions,
-                                )
-                            }
+                        route.startsWith(ToolRoutePrefix) -> when (ToolCatalog.find(route.removePrefix(ToolRoutePrefix))?.id) {
+                            ToolCatalog.MEDIA_DOWNLOAD_ID -> MediaDownloadFlowPage(
+                                onBack = { navigator.pop() },
+                                permissions = permissions,
+                            )
+                            ToolCatalog.SYMMETRY_ID -> SymmetryPage(onBack = { navigator.pop() })
+                            else -> Unit
                         }
                     }
                 }

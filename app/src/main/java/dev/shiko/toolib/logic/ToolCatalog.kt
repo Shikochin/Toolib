@@ -14,6 +14,7 @@ data class ToolDefinition(
 /** Registry of every tool the app exposes on the home page. */
 object ToolCatalog {
     const val MEDIA_DOWNLOAD_ID = "media-download"
+    const val SYMMETRY_ID = "symmetry"
 
     val tools: List<ToolDefinition> = listOf(
         ToolDefinition(
@@ -21,6 +22,13 @@ object ToolCatalog {
             titleRes = R.string.tool_media_download_title,
             descriptionRes = R.string.tool_media_download_description,
             icon = "download",
+            permission = PermissionLevel.NONE,
+        ),
+        ToolDefinition(
+            id = SYMMETRY_ID,
+            titleRes = R.string.tool_symmetry_title,
+            descriptionRes = R.string.tool_symmetry_description,
+            icon = "contrast",
             permission = PermissionLevel.NONE,
         ),
     )
